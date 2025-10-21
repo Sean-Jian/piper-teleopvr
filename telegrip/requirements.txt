@@ -1,0 +1,16 @@
+# Basic requirements for telegrip package
+# For development with pinned versions, use: pip install -r requirements-dev.txt
+# For installation as package, use: pip install -e .
+
+numpy
+torch
+scipy
+pybullet
+websockets
+pynput
+lerobot[feetech]
+# For development
+pytest
+black
+flake8
+pyyaml>=6.0 

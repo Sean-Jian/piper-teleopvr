@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools >= 61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "telegrip"
+version = "1.0.0"
+description = "Teleoperation Control System for the SO100 Robot Arm(s)"
+authors = [
+    {name = "Emil Rofors", email = "emirof@gmail.com"},
+]
+keywords = ["robotics", "teleoperation", "vr", "robot-control"]
+
+dependencies = [
+    "numpy",
+    "torch",
+    "websockets",
+    "pynput",
+    "pybullet",
+    "scipy",
+    "pyyaml",
+]
+
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "black",
+    "flake8",
+    "mypy",
+]
+
+[project.scripts]
+telegrip = "telegrip.main:main_cli"
+
+[project.urls]
+Homepage = "https://github.com/your-username/vr_so100_teleoperation"
+Repository = "https://github.com/your-username/vr_so100_teleoperation"
+
+[tool.setuptools]
+packages = ["telegrip"] 
