@@ -1,4 +1,4 @@
-# Qijia-teleopVR
+#Piper VR-Teleop
 
 ###  描述：
 该项目实现了基于VR的机械臂控制。机械臂采用松灵机器人6Dof piper机械臂*2 
