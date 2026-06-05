@@ -8,6 +8,10 @@
     <img src="media/piper_demo.gif" alt="demo" width="600">
 </p>
 
+<p align="center">
+    <img src="vr_info.jpg" alt="VR info" width="600">
+</p>
+
 
 
 ###  使用
