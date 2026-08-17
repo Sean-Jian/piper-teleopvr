@@ -1,34 +1,137 @@
-#Piper VR-Teleop
-
-###  描述：
-该项目实现了基于VR的机械臂控制。机械臂采用松灵机器人6Dof piper机械臂*2 
-通过webXR和webSocket/Server获取VR手柄的位姿，并基于增量来控制机械臂移动。
+# Piper VR Teleoperation
 
 <p align="center">
-    <img src="media/piper_demo.gif" alt="demo" width="600">
+  <a href="./README.md"><img alt="English" src="https://img.shields.io/badge/English-README-0969da"></a>
+  <a href="./README.zh-CN.md"><img alt="简体中文" src="https://img.shields.io/badge/%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-README-d73a49"></a>
 </p>
+
+A WebXR teleoperation system for two AgileX Piper 6-DoF robot arms. It streams VR controller poses and buttons over WebSocket, maps incremental hand motion to end-effector targets, solves inverse kinematics, and drives both arms through the Piper SDK.
 
 <p align="center">
-    <img src="vr_info.jpg" alt="VR info" width="600">
+  <img src="media/piper_demo.gif" alt="Piper dual-arm VR teleoperation demo" width="600">
 </p>
 
+## Highlights
 
+- Browser-based WebXR client with no native headset app
+- Independent and simultaneous control of two Piper arms
+- Grip dead-man switches and trigger-controlled grippers
+- CasADi/Pinocchio IK with joint-jump detection
+- Low-pass filtering, IK timeout fallback, and interpolated startup/home motion
+- Local HTTPS and secure WebSocket communication
 
-###  使用
-1.依赖python==3.10.18环境，最好创建conda虚拟环境。
-2.依赖[lerobot项目](https://github.com/huggingface/lerobot.git),切换到哈希码69901b9b的commit后安装：pip install -e .(外层lerobot目录下操作)。
-3.依赖[松灵piper机械臂的SDK](https://github.com/agilexrobotics/piper_sdk.git)，切换到版本0.4.3后安装：pip install .(外层piper_sdk目录下操作)。
-4.按照[松灵piper机械臂的SDK](https://github.com/agilexrobotics/piper_sdk.git)指示激活双臂的CAN模块,要注意can-utils的版本问题,默认apt install的版本可能比较旧，容易导致机械臂的CAN通信失败,可以手动安装较新版本的can-utils:
-``` bash
+## System architecture
+
+~~~mermaid
+flowchart LR
+    V[VR headset<br/>WebXR controllers] -->|HTTPS :8443| W[Web UI]
+    W -->|pose and buttons<br/>WSS :8442| S[VR WebSocket server]
+    S --> C[Controller state<br/>grip / trigger / A / X]
+    C --> M[Incremental pose mapping<br/>VR frame to robot frame]
+    M --> I[Dual-arm IK<br/>CasADi + Pinocchio]
+    I --> F[Safety and smoothing<br/>jump check / timeout fallback / low-pass filter]
+    F --> P[Piper SDK<br/>MIT joint and gripper commands]
+    P --> L[Left CAN<br/>arm_l]
+    P --> R[Right CAN<br/>arm_r]
+    L --> LA[Left Piper arm]
+    R --> RA[Right Piper arm]
+    LA -->|joint and pose feedback| H[State / home interpolation]
+    RA -->|joint and pose feedback| H
+    H --> M
+    C -->|A or X with grip released| H
+~~~
+
+Holding grip captures the current hand and robot poses. Subsequent hand motion is applied incrementally, so releasing and pressing grip again works like a clutch. Each target is transformed into the robot frame and solved independently for the left or right arm. Valid joint targets are filtered and sent in MIT mode; slow or failed IK falls back to the last successful command. Startup and A/X home motions use joint interpolation to avoid abrupt movement.
+
+## Requirements
+
+- Two AgileX Piper arms
+- A WebXR-capable VR headset and controllers
+- A Linux PC on the same LAN as the headset
+- Two CAN interfaces named arm_l and arm_r
+- Python 3.10.18 recommended
+
+Core dependencies include [LeRobot](https://github.com/huggingface/lerobot), [Piper SDK](https://github.com/agilexrobotics/piper_sdk), NumPy, SciPy, CasADi, Pinocchio, WebSockets, and PyYAML.
+
+## Installation
+
+Install LeRobot at commit 69901b9b:
+
+~~~bash
+git clone https://github.com/huggingface/lerobot.git
+cd lerobot
+git checkout 69901b9b
+pip install -e .
+~~~
+
+Install Piper SDK version 0.4.3:
+
+~~~bash
+git clone https://github.com/agilexrobotics/piper_sdk.git
+cd piper_sdk
+git checkout 0.4.3
+pip install .
+~~~
+
+Install this project's dependencies:
+
+~~~bash
+cd telegrip
+pip install -r requirements.txt
+~~~
+
+The Piper IK module also imports CasADi and Pinocchio; install compatible builds if your environment does not already provide them.
+
+## CAN setup
+
+Configure and activate both adapters according to the Piper SDK documentation. If the packaged can-utils version causes communication failures, build a newer version:
+
+~~~bash
 cd /tmp
 git clone https://github.com/linux-can/can-utils.git
 cd can-utils
 make
 sudo make install
-```
-5.之后可以运行松灵机械臂的一些demo来测试一下机械臂是否能正常使用。
-6.之后运行脚本qijia-teleopvr/telegrip/telegrip/**main_vr_control_piper_V8_mit_interpolation.py**，注意文件中piper机械臂的urdf文件的绝对路径和urdf文件里面的STL文件的绝对路径是否正确；也可以运行同目录其他以main_vr_control_piper相关的demo代码，具体参照文件开头的说明；按照指示将VR头显跟PC连接到同一个网段（通常指连接至同一个wifi路由器），之后在VR头显中访问PC电脑IP的8443端口，点击网页中间的开始控制按钮就可以通过手柄控制双臂，中途如果取下过头显，再次控制时需要最好刷新一下网页。
-7.手柄使用：
-- 每个手柄的侧边按钮**保持按下**才可以触发相应的机械臂控制，类似离合的作用，即走即停
-- 每个手柄的trigger按钮都可以控制对应机械臂夹爪的抓取（**需按住离合按钮**）
-- 每个手柄均具有一键让机械臂回到初始位置的功能，这个功能主要作为一种安全机制；左手柄是**X键**，右手柄是**A键**(**均需松开侧边离合按钮才能生效~**)
+~~~
+
+Test both arms with examples under telegrip/telegrip/piper_demo_V2/ before starting VR control.
+
+## Configuration and run
+
+Update the absolute urdf_path in telegrip/telegrip/main_vr_control_piper_V8_mit_interpolation.py and ensure the mesh paths inside the URDF resolve correctly. Then run:
+
+~~~bash
+cd telegrip
+python telegrip/main_vr_control_piper_V8_mit_interpolation.py
+~~~
+
+Connect the headset and PC to the same LAN and open the following address in the headset browser:
+
+~~~text
+https://<PC-IP>:8443
+~~~
+
+Accept the local certificate warning if prompted and select the start-control button. Controller data uses WSS port 8442. If the headset is removed during a session, refresh the page before resuming.
+
+## Controller mapping
+
+| Input | Action |
+| --- | --- |
+| Hold left/right grip | Enable motion for the corresponding arm |
+| Release grip | Stop updating that arm's target |
+| Hold trigger while gripping | Close the corresponding gripper |
+| Left X with grip released | Interpolate the left arm home |
+| Right A with grip released | Interpolate the right arm home |
+
+> [!CAUTION]
+> This software commands physical robots. Verify CAN mapping, URDF paths, workspace clearance, and emergency-stop access before enabling the arms. Start at low speed with an observer and keep people outside the operating area.
+
+## VR controller data
+
+<p align="center">
+  <img src="vr_info.jpg" alt="VR controller information" width="600">
+</p>
+
+## License
+
+See [LICENSE](./LICENSE).
